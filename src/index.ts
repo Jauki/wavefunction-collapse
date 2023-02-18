@@ -1,4 +1,6 @@
+import { main } from "./ASCII/ascii"
 
-console.log("Hello world: ", (Math.random().toString(23)));
+console.log("Wave function Collapse Project: ASCII Implementation")
 
-// Todo: Initilize Project
+main(5, { W: 0.2, S: 0.3, L: 0.5 })
+
