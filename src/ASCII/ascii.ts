@@ -1,21 +1,28 @@
 // Little Test script to learn how WaveFunctionCollapse Works!
 
-type Terrain = 'W' | 'S' | 'L';
+export enum Terrain {
+  Water = "W",
+  Sand = "S",
+  Land = "L"
+}
+
+const terrainRules: Record<Terrain, Terrain[]> = {
+  [Terrain.Water]: [Terrain.Sand],
+  [Terrain.Sand]: [Terrain.Land, Terrain.Water],
+  [Terrain.Land]: [Terrain.Sand]
+};
 
 type Grid = Terrain[][];
 
-function generateRandomGrid(size: number, probabilities: Record<Terrain, number>): Grid {
-  const terrains = Object.keys(probabilities) as Terrain[];
+export function generateRandomGrid(size: number, probabilities: Record<Terrain, number>): Grid {
   const grid: Grid = [];
-
   for (let y = 0; y < size; y++) {
     const row: Terrain[] = [];
-
     for (let x = 0; x < size; x++) {
       let random = Math.random();
-      let terrain: Terrain | undefined;
+      let terrain: Terrain;
 
-      for (const t of terrains) {
+      for (const t of Object.values(Terrain)) {
         if (random < probabilities[t]) {
           terrain = t;
           break;
@@ -23,13 +30,10 @@ function generateRandomGrid(size: number, probabilities: Record<Terrain, number>
           random -= probabilities[t];
         }
       }
-
-      row.push(terrain || 'L');
+      row.push(terrain! || Terrain.Land);
     }
-
     grid.push(row);
   }
-
   return grid;
 }
 
@@ -39,92 +43,68 @@ function printGrid(grid: Grid): void {
   }
 }
 
-function createWaveFunction(size: number, terrains: Terrain[]): Record<string, number[]> {
-  const wf: Record<string, number[]> = {};
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const state: string[] = [];
-
-      for (const t of terrains) {
-        state.push(`${y},${x},${t}`);
-      }
-
-      wf[`${y},${x}`] = state.map((s) => wf[s] ? [...wf[s]] : s) as [];
-    }
-  }
-
-  return wf;
-}
-
-function chooseRandomState(states: number[]): number {
+function chooseRandomState(states: Terrain[]): Terrain {
   return states[Math.floor(Math.random() * states.length)];
 }
 
-// todo: fix collapse Wave Function
-function collapseWaveFunction(wf: Record<string, number[]>, grid: Grid): boolean {
-  const uncollapsed = Object.keys(wf);
-  if (uncollapsed.length === 0) return true;
+function collapseWaveFunction(grid: Grid, x: number, y: number, states: Terrain[], probabilities: Record<Terrain, number>): void {
+  const validStates = states.filter(state => {
+    const neighbors = getNeighbors(grid, x, y, false) as Terrain[];
+    const validTerrains = terrainRules[state];
+    return neighbors.every(neighbor => validTerrains.includes(neighbor));
+  });
 
-  const [minCell, minStates] = uncollapsed.reduce<[string, number[]]>((min, cell) => {
-    const [y, x] = cell.split(',').map(Number);
-    const numStates = wf[cell].length;
+  const newState = chooseRandomState(validStates);
+  grid[y][x] = newState;
 
-    if (numStates === 1) {
-      grid[y][x] = wf[cell][0].toString() as Terrain;
-      console.log("foo!")
-      return min;
-    } else if (numStates < min[1].length) {
-      return [cell, wf[cell]];
-    } else {
-      return min;
-    }
-  }, ['', []]);
 
-  const nextState = chooseRandomState(minStates);
-  console.log(minStates)
-  // const [y, x, terrain] = minStates[nextState].split(',').map(Number);
-
-  // grid[y][x] = terrain.toString() as Terrain;
-  // delete wf[minCell];
-
-  // for (const cell in wf) {
-  //   if (cell === minCell) continue;
-  //   const [y2, x2] = cell.split(',').map(Number);
-
-  //   wf[cell] = wf[cell].filter((state) => {
-  //     const [y3, x3] = state.toString().split(',').map(Number);
-  //     const distance = Math.abs(y2 - y) + Math.abs(x2 - x);
-
-  //     if (distance === 0) return true;
-
-  //     const terrain1 = grid[y][x];
-  //     const terrain2 = grid[y3][x3];
-
-  //     return terrain1 === terrain2 || (terrain1 === 'S' && terrain2 === 'W') || (terrain1 === 'W' && terrain2 === 'S');
-  //   });
-
-  //   if (wf[cell].length === 0) return false;
-  // }
-
-  // return collapseWaveFunction(wf, grid);
-  return true
+  const neighbors = getNeighbors(grid, x, y, true) as number[][];
+  for (let i = 0; i < neighbors.length; i++) {
+    propagateWaveFunction(grid, neighbors[i][0], neighbors[i][1] , probabilities);
+  }
 }
 
 
+function propagateWaveFunction(grid: Grid, x: number, y: number, probabilities: Record<Terrain, number>): void {
+  const states = Object.values(Terrain);
+  if (grid[y][x] !== undefined) {
+    states.splice(states.indexOf(grid[y][x]), 1);
+  }
+
+  if (states.length === 1) {
+    return;
+  }
+
+  collapseWaveFunction(grid, x, y, states, probabilities);
+}
+
+function getNeighbors(grid: Grid, x: number, y: number, coordinate: boolean): Terrain[] | number[][] {
+  const size = grid.length;
+  const neighbors: Terrain[] = [];
+  let coordinates: number[][] = [[]];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) {
+        continue;
+      }
+      const nx = x + dx;
+      const ny = y + dy;
+
+      // Check if the cell is within the grid
+      if (nx < 0 || ny < 0 || nx >= size || ny >= size) {
+        continue;
+      }
+      coordinates.push([ny, nx]);
+      neighbors.push(grid[ny][nx]);
+    }
+  }
+  coordinates.shift()
+  return coordinate ? coordinates! : neighbors;
+}
+
 export function main(size: number, probabilities: Record<Terrain, number>) {
   const grid = generateRandomGrid(size, probabilities);
-  const wf =createWaveFunction(5, ['W', 'S','L']);;
-
+  propagateWaveFunction(grid, 0, 0, probabilities);
   console.log('Initial grid:');
   printGrid(grid)
-
-  const result = collapseWaveFunction(wf, grid);
-
-  if (result) {
-    console.log('Collapsed grid:');
-    console.log(grid);
-  } else {
-    console.log('Failed to collapse grid');
-  }
 }
