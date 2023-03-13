@@ -48,6 +48,7 @@ function chooseRandomState(states: Terrain[]): Terrain {
 }
 
 function collapseWaveFunction(grid: Grid, x: number, y: number, states: Terrain[], probabilities: Record<Terrain, number>): void {
+  // fixme: 
   const validStates = states.filter(state => {
     const neighbors = getNeighbors(grid, x, y, false) as Terrain[];
     const validTerrains = terrainRules[state];
@@ -66,45 +67,47 @@ function collapseWaveFunction(grid: Grid, x: number, y: number, states: Terrain[
 
 
 function propagateWaveFunction(grid: Grid, x: number, y: number, probabilities: Record<Terrain, number>): void {
-  const states = Object.values(Terrain);
-  if (grid[y][x] !== undefined) {
-    states.splice(states.indexOf(grid[y][x]), 1);
-  }
+  // todo: rewrite the propagate function!!
+  // const states = Object.values(Terrain);
+  // if (grid[y][x] !== undefined) {
+  //   states.splice(states.indexOf(grid[y][x]), 1);
+  // }
 
-  if (states.length === 1) {
-    return;
-  }
+  // if (states.length === 1) {
+  //   return;
+  // }
 
-  collapseWaveFunction(grid, x, y, states, probabilities);
+  // collapseWaveFunction(grid, x, y, states, probabilities);
 }
 
 function getNeighbors(grid: Grid, x: number, y: number, coordinate: boolean): Terrain[] | number[][] {
-  const size = grid.length;
-  const neighbors: Terrain[] = [];
-  let coordinates: number[][] = [[]];
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      if (dx === 0 && dy === 0) {
-        continue;
-      }
-      const nx = x + dx;
-      const ny = y + dy;
+  // const size = grid.length;
+  // const neighbors: Terrain[] = [];
+  // let coordinates: number[][] = [[]];
+  // for (let dy = -1; dy <= 1; dy++) {
+  //   for (let dx = -1; dx <= 1; dx++) {
+  //     if (dx === 0 && dy === 0) {
+  //       continue;
+  //     }
+  //     const nx = x + dx;
+  //     const ny = y + dy;
 
-      // Check if the cell is within the grid
-      if (nx < 0 || ny < 0 || nx >= size || ny >= size) {
-        continue;
-      }
-      coordinates.push([ny, nx]);
-      neighbors.push(grid[ny][nx]);
-    }
-  }
-  coordinates.shift()
-  return coordinate ? coordinates! : neighbors;
+  //     // Check if the cell is within the grid
+  //     if (nx < 0 || ny < 0 || nx >= size || ny >= size) {
+  //       continue;
+  //     }
+  //     coordinates.push([ny, nx]);
+  //     neighbors.push(grid[ny][nx]);
+  //   }
+  // }
+  // coordinates.shift()
+  // return coordinate ? coordinates! : neighbors;
+  return  [[0,2]];
 }
 
 export function main(size: number, probabilities: Record<Terrain, number>) {
   const grid = generateRandomGrid(size, probabilities);
-  propagateWaveFunction(grid, 0, 0, probabilities);
+  // propagateWaveFunction(grid, 0, 0, probabilities);
   console.log('Initial grid:');
   printGrid(grid)
 }
