@@ -1,4 +1,4 @@
-import { generateRandomGrid, main, Terrain } from "./ASCII/ascii"
+import {  main, Terrain } from "./ASCII/ascii"
 
 console.log("Wave function Collapse Project: ASCII Implementation")
 

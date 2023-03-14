@@ -1,113 +1,188 @@
 // Little Test script to learn how WaveFunctionCollapse Works!
 
+import { getRandomEnumValue } from "../misc";
+
 export enum Terrain {
   Water = "W",
   Sand = "S",
   Land = "L"
 }
 
-const terrainRules: Record<Terrain, Terrain[]> = {
-  [Terrain.Water]: [Terrain.Sand],
-  [Terrain.Sand]: [Terrain.Land, Terrain.Water],
-  [Terrain.Land]: [Terrain.Sand]
-};
 
-type Grid = Terrain[][];
+type Cell = Terrain[];
 
-export function generateRandomGrid(size: number, probabilities: Record<Terrain, number>): Grid {
-  const grid: Grid = [];
-  for (let y = 0; y < size; y++) {
-    const row: Terrain[] = [];
-    for (let x = 0; x < size; x++) {
-      let random = Math.random();
-      let terrain: Terrain;
+type Grid = Cell[][];
 
-      for (const t of Object.values(Terrain)) {
-        if (random < probabilities[t]) {
-          terrain = t;
-          break;
-        } else {
-          random -= probabilities[t];
-        }
-      }
-      row.push(terrain! || Terrain.Land);
+// maybe add Type saftey that it cannot by bigger than size?? 
+type Coordinate = {
+  x: number;
+  y: number;
+}
+
+const pickedCell = [] as Coordinate[];
+const propagatedCell = [] as Coordinate[];
+const entropiedCell = [] as Coordinate[];
+
+
+export function generateInitGrid(size: number): Grid {
+  const grid: Grid = [...Array(size+1)].map(e => Array(size+1));
+  for (let i = 0; i <= size; i++) {
+    for (let j = 0; j <= size; j++){
+      grid[i][j] = [Terrain.Land, Terrain.Sand, Terrain.Water];
     }
-    grid.push(row);
   }
   return grid;
 }
 
 function printGrid(grid: Grid): void {
   for (const row of grid) {
-    console.log(row.join(' '));
+    console.log(row.map((c: Cell) => c.toString().padEnd(5, " ")).join(" "));
   }
 }
 
-function chooseRandomState(states: Terrain[]): Terrain {
-  return states[Math.floor(Math.random() * states.length)];
+function getGridSize(grid: Grid): number {
+  return grid.length;
 }
 
-function collapseWaveFunction(grid: Grid, x: number, y: number, states: Terrain[], probabilities: Record<Terrain, number>): void {
-  // fixme: 
-  const validStates = states.filter(state => {
-    const neighbors = getNeighbors(grid, x, y, false) as Terrain[];
-    const validTerrains = terrainRules[state];
-    return neighbors.every(neighbor => validTerrains.includes(neighbor));
-  });
-
-  const newState = chooseRandomState(validStates);
-  grid[y][x] = newState;
+const getRandomCoordinate = (size: number): Coordinate => {
+  const x = Math.floor(Math.random() * size );
+  const y = Math.floor(Math.random() * size );
+  return { x, y };
+}
 
 
-  const neighbors = getNeighbors(grid, x, y, true) as number[][];
-  for (let i = 0; i < neighbors.length; i++) {
-    propagateWaveFunction(grid, neighbors[i][0], neighbors[i][1] , probabilities);
+function pickRandomUnpickedCell(grid: Grid, cell?: Coordinate | undefined) {
+  const size = getGridSize(grid);
+  if (cell === undefined) {
+    let coordiante: Coordinate;
+    do {
+      coordiante = getRandomCoordinate(size);
+    } while (pickedCell.includes(coordiante))  
+    grid[coordiante.y][coordiante.x] = Array.of(getRandomEnumValue(Terrain));
+  } else {
+    grid[cell.y][cell.x] = Array.of(getRandomEnumValue(Terrain));
+  }
+  console.log("")
+  printGrid(grid)
+  propagateGrid(grid);
+  //xshannonEntropy(grid);
+  console.log("")
+  printGrid(grid)
+}
+
+
+function getNeighbors(grid: Grid, target: Coordinate): Coordinate[] {
+  let neighbors: Coordinate[] = [];
+  if (target.x > 0) {
+    neighbors.push({x : target.x - 1, y:  target.y })
+  }
+  if (target.x < grid.length - 1) {
+    neighbors.push({x : target.x + 1, y:  target.y })
+  }
+  if (target.y > 0) {
+    neighbors.push({x : target.x, y:  target.y - 1 })
+  }
+  if (target.y < grid.length - 1) {
+    neighbors.push({x : target.x, y:  target.y + 1 })
+  }
+  return neighbors;
+}
+
+function setPropabilites(terrain: Terrain) {
+  // cell -> L -> S oder L 
+  // cell -> W -> S  oder W
+  // cell -> S -> L oder W oder S
+
+  switch (terrain) {
+    case Terrain.Water: return [Terrain.Sand, Terrain.Water];
+    case Terrain.Sand: return [Terrain.Sand, Terrain.Water, Terrain.Land];
+    case Terrain.Land: return [Terrain.Sand, Terrain.Land];
+  }
+}
+
+function propagateGrid(grid: Grid) {
+  for (let i = 0; i <= grid.length - 1; i++) {
+    for (let j = 0; j <= grid.length - 1; j++){
+      if (grid[i][j].length === 1
+        && !propagatedCell.includes({ x: j, y: i })) {
+        const currentCell = grid[i][j]
+        const neighbors = getNeighbors(grid, { x: j, y: i });
+        for (const neighbor of neighbors) {
+          grid[neighbor.y][neighbor.x] = setPropabilites(currentCell[0])
+        }
+        propagatedCell.push({ x: j, y: i })
+        const stateCounts: TerrainStates = { W: 0, L: 0, S: 0 }
+        // für nachbarn von nachbarn
+        for (const neighbor of neighbors) {
+          for (const cell of grid[neighbor.y][neighbor.x]) {
+            stateCounts[cell]++;
+          }
+        }
+        console.log(stateCounts)
+        // take cell and entropy
+      }
+    }
   }
 }
 
 
-function propagateWaveFunction(grid: Grid, x: number, y: number, probabilities: Record<Terrain, number>): void {
-  // todo: rewrite the propagate function!!
-  // const states = Object.values(Terrain);
-  // if (grid[y][x] !== undefined) {
-  //   states.splice(states.indexOf(grid[y][x]), 1);
-  // }
-
-  // if (states.length === 1) {
-  //   return;
-  // }
-
-  // collapseWaveFunction(grid, x, y, states, probabilities);
+type TerrainStates = {
+  [k in  Terrain]: number;
 }
 
-function getNeighbors(grid: Grid, x: number, y: number, coordinate: boolean): Terrain[] | number[][] {
-  // const size = grid.length;
-  // const neighbors: Terrain[] = [];
-  // let coordinates: number[][] = [[]];
-  // for (let dy = -1; dy <= 1; dy++) {
-  //   for (let dx = -1; dx <= 1; dx++) {
-  //     if (dx === 0 && dy === 0) {
-  //       continue;
-  //     }
-  //     const nx = x + dx;
-  //     const ny = y + dy;
 
-  //     // Check if the cell is within the grid
-  //     if (nx < 0 || ny < 0 || nx >= size || ny >= size) {
-  //       continue;
-  //     }
-  //     coordinates.push([ny, nx]);
-  //     neighbors.push(grid[ny][nx]);
-  //   }
-  // }
-  // coordinates.shift()
-  // return coordinate ? coordinates! : neighbors;
-  return  [[0,2]];
+
+function shannonEntropy(grid: Grid) {
+  const entropy = [...Array(grid.length)].map(e => Array(grid.length));
+  for (let i = 0; i < grid.length; i++) {
+    for (let j = 0; j < grid.length; j++) {
+      const stateCounts: TerrainStates = { W: 0, L: 0, S: 0 }
+      
+      const neighbors = getNeighbors(grid, { x: j, y: i });
+      // fixme
+      for (const neighbor of neighbors) {
+        for (const cell of grid[neighbor.y][neighbor.x]) {
+          stateCounts[cell]++;
+        }
+      }
+      
+      const entropyValue: number = -Object.values(stateCounts)
+        .filter(f => f > 0) // exclude states with zero frequency
+        .reduce((sum, f) => sum + f * Math.log2(f), 0);
+      console.log(`Cell: x:${j} y:${i} Entropy: ${entropyValue}`)
+      entropy[i][j] = entropyValue
+    }
+  }
+  let biggestValue
+  do {
+    let [x, y] = findBiggestValuePosition(entropy)
+    biggestValue = { x: x, y: y };
+  } while (entropiedCell.includes(biggestValue))
+  entropiedCell.push(biggestValue)
+  pickRandomUnpickedCell(grid, biggestValue)
 }
+
+function findBiggestValuePosition(arr: number[][]): [number, number] {
+  const flattened = arr.flat();
+  const maxValue = Math.min(...flattened);
+  const minIndex = flattened.indexOf(maxValue);
+  const numRows = arr.length;
+  const numCols = arr[0].length;
+  const minRow = Math.floor(minIndex / numCols);
+  const minCol = minIndex % numCols;
+  return [minRow, minCol];
+}
+
 
 export function main(size: number, probabilities: Record<Terrain, number>) {
-  const grid = generateRandomGrid(size, probabilities);
-  // propagateWaveFunction(grid, 0, 0, probabilities);
+  const grid = generateInitGrid(size);
   console.log('Initial grid:');
   printGrid(grid)
+  pickRandomUnpickedCell(grid);
+  // 1. Propagate
+  //   1. iterate list
+  //   2. get Neighbors
+  //   3. change Neighbors, Cell
+  // 2. log
+  console.log("Random picked cell")
 }
