@@ -19,6 +19,11 @@ type Coordinate = {
   y: number;
 }
 
+function hasDuplicateCoordinate(arr: Coordinate[], coord: Coordinate): boolean {
+  return arr.some(item => item.x === coord.x && item.y === coord.y);
+}
+
+
 const pickedCell = [] as Coordinate[];
 const propagatedCell = [] as Coordinate[];
 const entropiedCell = [] as Coordinate[];
@@ -40,34 +45,31 @@ function printGrid(grid: Grid): void {
   }
 }
 
-function getGridSize(grid: Grid): number {
-  return grid.length;
-}
-
 const getRandomCoordinate = (size: number): Coordinate => {
   const x = Math.floor(Math.random() * size );
   const y = Math.floor(Math.random() * size );
   return { x, y };
 }
 
+let count = 0;
+
 
 function pickRandomUnpickedCell(grid: Grid, cell?: Coordinate | undefined) {
-  const size = getGridSize(grid);
-  if (cell === undefined) {
-    let coordiante: Coordinate;
-    do {
-      coordiante = getRandomCoordinate(size);
-    } while (pickedCell.includes(coordiante))  
-    grid[coordiante.y][coordiante.x] = Array.of(getRandomEnumValue(Terrain));
-  } else {
-    grid[cell.y][cell.x] = Array.of(getRandomEnumValue(Terrain));
+  const coordiante = shannonEntropy(grid);
+  console.log("Biggest: " + coordiante.x + ", " + coordiante.y);
+  const selected = grid[coordiante.y][coordiante.x];
+  
+  const terrain = selected[Math.floor(Math.random() * selected.length)];
+  grid[coordiante.y][coordiante.x] = Array.of(terrain);
+  
+  console.log("-----------------------------------")
+  grid = propagateGrid(grid);
+  printGrid(grid);
+  console.log("-----------------------------------")
+  if (count <= 4 ) {
+    count++;
+    pickRandomUnpickedCell(grid);
   }
-  console.log("")
-  printGrid(grid)
-  propagateGrid(grid);
-  //xshannonEntropy(grid);
-  console.log("")
-  printGrid(grid)
 }
 
 
@@ -92,7 +94,7 @@ function setPropabilites(terrain: Terrain) {
   // cell -> L -> S oder L 
   // cell -> W -> S  oder W
   // cell -> S -> L oder W oder S
-
+  /// TODO: it overwrites the cell if it was already selected 
   switch (terrain) {
     case Terrain.Water: return [Terrain.Sand, Terrain.Water];
     case Terrain.Sand: return [Terrain.Sand, Terrain.Water, Terrain.Land];
@@ -102,27 +104,19 @@ function setPropabilites(terrain: Terrain) {
 
 function propagateGrid(grid: Grid) {
   for (let i = 0; i <= grid.length - 1; i++) {
-    for (let j = 0; j <= grid.length - 1; j++){
+    for (let j = 0; j <= grid.length - 1; j++) {
       if (grid[i][j].length === 1
-        && !propagatedCell.includes({ x: j, y: i })) {
+        && hasDuplicateCoordinate(pickedCell, {x: j, y: i})) {
         const currentCell = grid[i][j]
         const neighbors = getNeighbors(grid, { x: j, y: i });
         for (const neighbor of neighbors) {
           grid[neighbor.y][neighbor.x] = setPropabilites(currentCell[0])
         }
         propagatedCell.push({ x: j, y: i })
-        const stateCounts: TerrainStates = { W: 0, L: 0, S: 0 }
-        // für nachbarn von nachbarn
-        for (const neighbor of neighbors) {
-          for (const cell of grid[neighbor.y][neighbor.x]) {
-            stateCounts[cell]++;
-          }
-        }
-        console.log(stateCounts)
-        // take cell and entropy
       }
     }
   }
+  return grid;
 }
 
 
@@ -132,39 +126,64 @@ type TerrainStates = {
 
 
 
-function shannonEntropy(grid: Grid) {
+function shannonEntropy(grid: Grid): Coordinate {
   const entropy = [...Array(grid.length)].map(e => Array(grid.length));
   for (let i = 0; i < grid.length; i++) {
     for (let j = 0; j < grid.length; j++) {
       const stateCounts: TerrainStates = { W: 0, L: 0, S: 0 }
       
       const neighbors = getNeighbors(grid, { x: j, y: i });
-      // fixme
       for (const neighbor of neighbors) {
         for (const cell of grid[neighbor.y][neighbor.x]) {
           stateCounts[cell]++;
         }
       }
+      // Calc Shanon Entropy
+      const shannonEntropyF = (val: number[]) => 
+        val.map(v => -v * Math.log2(v)).reduce((x, y) => x + y, 0);
       
-      const entropyValue: number = -Object.values(stateCounts)
-        .filter(f => f > 0) // exclude states with zero frequency
-        .reduce((sum, f) => sum + f * Math.log2(f), 0);
-      console.log(`Cell: x:${j} y:${i} Entropy: ${entropyValue}`)
+      const entropyValue = shannonEntropyF(Object.values(stateCounts))
+      
+      // console.log(`Cell: x:${j} y:${i} Entropy: ${entropyValue}`)
       entropy[i][j] = entropyValue
     }
   }
-  let biggestValue
+  
+  // let [x, y] = findBiggestValuePosition(entropy);
+  // console.log(x, y)
+  let coordinate;
+  let i = -1;
   do {
-    let [x, y] = findBiggestValuePosition(entropy)
-    biggestValue = { x: x, y: y };
-  } while (entropiedCell.includes(biggestValue))
-  entropiedCell.push(biggestValue)
-  pickRandomUnpickedCell(grid, biggestValue)
+    i++;
+    coordinate = sortEntropyArray(entropy)[i]
+  } while (hasDuplicateCoordinate(pickedCell, coordinate));
+  pickedCell.push(coordinate)
+  return coordinate;
+}
+
+function sortEntropyArray(array: number[][]): Coordinate[] {
+  // Create an array of { value, coordinate } objects
+  let data: { value: number, coordinate: Coordinate }[] = [];
+  for (let y = 0; y < array.length; y++) {
+    for (let x = 0; x < array[y].length; x++) {
+      data.push({ value: array[y][x], coordinate: { x, y } });
+    }
+  }
+
+  // Sort the array by value
+  data.sort((a, b) => a.value - b.value);
+  data = data.filter((e) => !isNaN(e.value));
+  // Create a new array of sorted coordinates
+  const sortedCoords: Coordinate[] = [];
+  for (let i = 0; i < data.length; i++) {
+    sortedCoords.push(data[i].coordinate);
+  }
+  return sortedCoords;
 }
 
 function findBiggestValuePosition(arr: number[][]): [number, number] {
   const flattened = arr.flat();
-  const maxValue = Math.min(...flattened);
+  const maxValue = Math.max(...flattened);
   const minIndex = flattened.indexOf(maxValue);
   const numRows = arr.length;
   const numCols = arr[0].length;
@@ -179,10 +198,4 @@ export function main(size: number, probabilities: Record<Terrain, number>) {
   console.log('Initial grid:');
   printGrid(grid)
   pickRandomUnpickedCell(grid);
-  // 1. Propagate
-  //   1. iterate list
-  //   2. get Neighbors
-  //   3. change Neighbors, Cell
-  // 2. log
-  console.log("Random picked cell")
 }
