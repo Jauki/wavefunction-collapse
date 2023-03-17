@@ -1,5 +1,6 @@
 // Little Test script to learn how WaveFunctionCollapse Works!
 
+import { ChildProcess } from "child_process";
 import { getRandomEnumValue } from "../misc";
 
 export enum Terrain {
@@ -62,9 +63,9 @@ function pickRandomUnpickedCell(grid: Grid) {
   
   const terrain = selected[Math.floor(Math.random() * selected.length)];
   grid[coordiante.y][coordiante.x] = Array.of(terrain);
-  
+  printGrid(grid)
   console.log("-----------------------------------")
-  grid = propagateGrid(grid);
+  grid = propagateGrid(coordiante as Coordinate, grid,);
   printGrid(grid);
   console.log("-----------------------------------")
   pickRandomUnpickedCell(grid);
@@ -92,31 +93,26 @@ function setPropabilites(terrain: Terrain[]) {
   // cell -> L -> S oder L 
   // cell -> W -> S  oder W
   // cell -> S -> L oder W oder S
-  if (terrain.length < 1) {
-    return terrain
-  } else {
+    // console.log(terrain)
     switch (terrain[0]) {
       case Terrain.Water: return [Terrain.Sand, Terrain.Water];
       case Terrain.Sand: return [Terrain.Sand, Terrain.Water, Terrain.Land];
       case Terrain.Land: return [Terrain.Sand, Terrain.Land];
-    }
   }
 }
 
-function propagateGrid(grid: Grid) {
-  for (let i = 0; i < grid.length; i++) {
-    for (let j = 0; j < grid[i].length; j++) {
-      if (grid[i][j].length === 1
-        && hasDuplicateCoordinate(pickedCell, {x: j, y: i})) {
-        const currentCell = grid[i][j]
-        const neighbors = getNeighbors(grid, { x: j, y: i });
+function propagateGrid(coordiante: Coordinate, grid: Grid) {
+  // for (let i = 0; i < grid.length; i++) {
+  //   for (let j = 0; j < grid[i].length; j++) {
+        const currentCell = grid[coordiante.y][coordiante.x]
+  const neighbors = getNeighbors(grid, coordiante);
+        // todo: write function if the neighbor has been propagated or is in final state!
         for (const neighbor of neighbors) {
           grid[neighbor.y][neighbor.x] = setPropabilites(currentCell)
         }
-        propagatedCell.push({ x: j, y: i })
-      }
-    }
-  }
+        // propagatedCell.push({ x: j, y: i })
+  //   }
+  // }
   return grid;
 }
 
